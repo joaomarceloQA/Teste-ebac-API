@@ -1,0 +1,42 @@
+name: CI de Testes de API
+
+on:
+  push:
+    branches: [main, master]
+
+env:
+  URL_BASE: http://localhost:3000 # Passo 6: Configuração de ambiente
+
+jobs:
+  execucao-testes:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Instalar dependências
+        run: npm install
+
+      - name: Subir API e Rodar Testes
+        run: |
+          npx serverest@latest --port 3000 &
+          echo "Aguardando API..."
+          until $(curl --output /dev/null --silent --head --fail ${{ env.URL_BASE }}); do
+            printf '.'
+            sleep 5
+          done
+          echo "API Online!"
+          # Passo 4: Rodando com gerador de relatório mochawesome
+          npx cypress run --reporter mochawesome --reporter-options "reportDir=cypress/reports,overwrite=false,html=true,json=false" --config baseUrl=${{ env.URL_BASE }} --spec "cypress/integration/*.spec.js"
+
+      - name: Publicar Relatório no GitHub Pages # Passo 5: Publicação
+        if: always()
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./cypress/reports
